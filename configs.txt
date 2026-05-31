@@ -1,0 +1,1 @@
+vless://069d6601-02e9-4c02-937d-748219f05154@20.207.70.99:443?encryption=none&security=tls&sni=super-doodle-r74rrq44g5r7h5vx9-443.app.github.dev&fp=chrome&alpn=h2&insecure=1&allowInsecure=1&type=xhttp&host=super-doodle-r74rrq44g5r7h5vx9-443.app.github.dev&path=%2F&mode=packet-up#%F0%9F%8D%83G2Leafy%20%7C%20yoik8889-lang
