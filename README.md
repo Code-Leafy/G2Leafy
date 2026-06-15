@@ -1,12 +1,12 @@
 <div align="center">
 
-# G2rayXCodeLeafy
+# G2ray
 
 A sleek **web dashboard** for managing Xray VLESS xHTTP configs on GitHub Codespaces.
 
-[![Version](https://img.shields.io/badge/version-3.0.0-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2rayXCodeLeafy)
-[![License](https://img.shields.io/badge/license-MIT-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2rayXCodeLeafy)
-[![Status](https://img.shields.io/badge/status-stable-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2rayXCodeLeafy)
+[![Version](https://img.shields.io/badge/version-3.0.0-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2ray)
+[![License](https://img.shields.io/badge/license-MIT-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2ray)
+[![Status](https://img.shields.io/badge/status-stable-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2ray)
 
 </div>
 
@@ -22,7 +22,7 @@ A sleek **web dashboard** for managing Xray VLESS xHTTP configs on GitHub Codesp
 
 ## Overview
 
-G2rayXCodeLeafy is a powerful, interactive **web panel dashboard** designed to instantly deploy and manage Xray VLESS xHTTP configurations. Built specifically for the GitHub Codespaces environment, it automates port management, client creation, subscription generation, traffic monitoring, and connection controls through a modern browser-based UI.
+G2ray is a powerful, interactive **web panel dashboard** designed to instantly deploy and manage Xray VLESS xHTTP configurations. Built specifically for the GitHub Codespaces environment, it automates port management, client creation, subscription generation, traffic monitoring, and connection controls through a modern browser-based UI.
 
 Once the Python backend starts, it serves a full dashboard on the forwarded Codespaces web port. From there, you can manage clients, preview generated configs, copy subscription links, view logs, monitor usage, and control the Xray core without using a terminal UI.
 
@@ -36,7 +36,7 @@ Once the Python backend starts, it serves a full dashboard on the forwarded Code
 Want to use public nodes donated by other G2ray users? Import this subscription link directly into your V2ray/Xray client:
 
 ```text
-https://raw.githubusercontent.com/Code-Leafy/G2rayXCodeLeafy/main/configs.txt
+https://raw.githubusercontent.com/Code-Leafy/G2ray/main/configs.txt
 ```
 
 </details>
@@ -141,7 +141,7 @@ graph LR
 <summary><kbd>📁</kbd> Project Structure</summary>
 
 ```text
-G2rayXCodeLeafy/
+G2ray/
 ├── data/                    # Dynamic storage for usage stats, UUIDs, panel state, and configs
 ├── logs/                    # Xray and panel logs
 ├── assets/                  # Media resources, previews, and videos
@@ -193,6 +193,6 @@ Make sure the generated config uses the Codespaces forwarding domain for `sni` a
 
 > **⚠️ Educational Purpose Only:** This project is provided for educational and research purposes. Users are solely responsible for compliance with all local laws. The developer assumes no liability for misuse.
 
-[MIT License](https://github.com/Code-Leafy/G2rayXCodeLeafy/blob/main/LICENSE) · Crafted by [Code-Leafy](https://github.com/Code-Leafy)
+[MIT License](https://github.com/Code-Leafy/G2ray/blob/main/LICENSE) · Crafted by [Code-Leafy](https://github.com/Code-Leafy)
 
 </div>
