@@ -8,6 +8,7 @@ import copy
 import uuid
 import shutil
 import base64
+import asyncio
 import subprocess
 import threading
 import urllib.request
@@ -19,9 +20,9 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
-LOCAL_VERSION = "3.0.0"
+LOCAL_VERSION = "4.0.0"
 AUTO_UPDATE = True
-UPSTREAM_REPO = "Code-Leafy/G2rayXCodeLeafy"
+UPSTREAM_REPO = "Code-Leafy/G2ray"
 RAW_BASE = f"https://raw.githubusercontent.com/{UPSTREAM_REPO}/refs/heads/main/"
 
 DONATE_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxbTxcCS6sl7HpASqssmr6c9wYL1gsE86fBjFHTcRs0sl0o-R5ZAmKJk-z_GaBBRqcsHw/exec"
@@ -44,6 +45,8 @@ SYSTEM_LOG = os.path.join(LOG_DIR, "system.log")
 XRAY_BIN = "/usr/local/bin/xray"
 
 XRAY_PORT = 443
+XRAY_XHTTP_PORT = 10001
+XRAY_WS_PORT = 10003
 WEB_PORT = 8080
 API_PORT = 10085
 
@@ -60,7 +63,7 @@ state = {
     "total_down": 0, "total_up": 0, "uptime_sec": 0,
     "speed_down_bps": 0, "speed_up_bps": 0, "cpu_pct": 0.0,
     "mem_used_mb": 0, "mem_total_mb": 4096,
-    "disk_used_mb": 0, "disk_total_mb": 0,
+    "disk_used_gb": 0, "disk_total_gb": 0,
     "load_avg": [0,0,0], "is_xray_running": False,
     "client_usage_bytes": {},
     "ip_city": "N/A", "ip_country": "N/A", "ip_ipv4": "N/A",
@@ -77,6 +80,7 @@ except Exception:
 PORT_DOMAIN = f"{CODESPACE_NAME}-{XRAY_PORT}.app.github.dev"
 WEB_DOMAIN = f"{CODESPACE_NAME}-{WEB_PORT}.app.github.dev"
 GITHUB_USER = os.environ.get("GITHUB_USER", CODESPACE_NAME.split('-')[0] if '-' in CODESPACE_NAME else "User")
+PANEL_PASSWORD = os.environ.get("PASS", "")
 
 _cached_cert_sha = ""
 _cached_cert_time = 0
@@ -102,12 +106,155 @@ def get_codespace_cert_sha256():
     except Exception:
         return _cached_cert_sha
 
+SUB_HTML_TEMPLATE = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Profile</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><path fill='%2310b981' d='M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z'/></svg>" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root { --bg-base: #09090b; --bg-panel: #121214; --bg-hover: #1f1f22; --border: rgba(255,255,255,0.08); --border-hover: rgba(255,255,255,0.15); --text-main: #fafafa; --text-muted: #a1a1aa; --accent: #10b981; --accent-hover: #059669; --accent-bg: rgba(16,185,129,0.12); --danger: #ef4444; --warning: #f59e0b; --success: #10b981; --info: #3b82f6; --purple: #8b5cf6; --radius-md: 16px; --radius-sm: 10px; }
+        body { background: var(--bg-base); color: var(--text-main); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 24px 16px; display: flex; justify-content: center; min-height: 100vh; box-sizing: border-box; }
+        .container { max-width: 480px; width: 100%; display: flex; flex-direction: column; gap: 20px; padding-bottom: 30px; }
+        .card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); }
+        .card-title { margin: 0 0 16px 0; font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .stat-box { background: var(--bg-base); border: 1px solid var(--border); padding: 14px; border-radius: var(--radius-sm); }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.05em; }
+        .stat-val { font-size: 1.15rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+        .tag { padding: 4px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+        .btn { width: 100%; background: var(--bg-hover); color: var(--text-main); border: 1px solid var(--border); padding: 14px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; transition: all 0.2s ease; margin-top: 12px; }
+        .btn:hover { background: var(--border-hover); transform: translateY(-1px); }
+        .btn-primary { background: var(--accent); color: #000; border: none; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+        .btn-primary:hover { background: var(--accent-hover); color: #fff; }
+        .btn-icon { width: 40px; height: 40px; padding: 0; margin: 0; }
+        .link-item { background: var(--bg-base); border: 1px solid var(--border); padding: 14px; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; transition: border-color 0.2s; }
+        .link-item:hover { border-color: var(--border-hover); }
+        .link-item-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; color: var(--text-main); }
+        .link-item-sub { font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+        .progress-bar { width: 100%; height: 8px; background: var(--bg-hover); border-radius: 4px; margin-top: 10px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--success); border-radius: 4px; transition: width 0.3s ease; }
+        .progress-fill.warning { background: var(--warning); }
+        .progress-fill.danger { background: var(--danger); }
+        .qr-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); justify-content: center; align-items: center; z-index: 100; padding: 20px; animation: fadeIn 0.2s ease; }
+        .qr-modal.show { display: flex; }
+        .qr-card { background: #fff; padding: 24px; border-radius: var(--radius-md); text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5); transform: translateY(0); transition: transform 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .text-accent { color: var(--accent) !important; }
+        .text-info { color: var(--info) !important; }
+        .text-warning { color: var(--warning) !important; }
+        .text-purple { color: var(--purple) !important; }
+        
+        .import-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+        .btn-import { background: var(--bg-base); border: 1px solid var(--border); color: var(--text-main); text-decoration: none; padding: 14px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 700; text-align: center; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+        .btn-import:hover { background: var(--bg-hover); border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16,185,129,0.15); }
+        .btn-import i { font-size: 1.5rem; }
+        
+        .footer { text-align: center; margin-top: 20px; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+        .footer a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+        .footer a:hover { color: var(--text-main); }
+    </style>
+</head>
+<body>
+    <div class="container" id="app"></div>
+    <div class="qr-modal" id="qr-modal" onclick="this.classList.remove('show')">
+        <div class="qr-card" onclick="event.stopPropagation()">
+            <div id="qrcode" style="display:inline-block; padding:10px; border:4px solid #f0f0f0; border-radius:12px; background:#fff;"></div>
+            <button class="btn" style="margin-top:20px; background:#f4f4f5; color:#18181b; border:none;" onclick="document.getElementById('qr-modal').classList.remove('show')">Close QR</button>
+        </div>
+    </div>
+    <script>
+        const DATA = JSON.parse(atob('{{SUB_DATA_B64}}'));
+        function fmtGB(v){ return !v ? '∞' : v.toFixed(2)+' GB'; }
+        function fmtDate(d){ return !d ? 'Never' : new Date(d).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}); }
+        function cp(t){ navigator.clipboard.writeText(t).then(()=>{ const el=document.createElement('div'); el.innerText='Copied!'; el.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--success);color:#fff;padding:10px 20px;border-radius:20px;font-weight:700;z-index:999;box-shadow:0 4px 12px rgba(16,185,129,0.3);'; document.body.appendChild(el); setTimeout(()=>el.remove(),2000); }); }
+        function qr(t){ document.getElementById('qrcode').innerHTML=''; new QRCode(document.getElementById('qrcode'),{text:t,width:220,height:220,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M}); document.getElementById('qr-modal').classList.add('show'); }
+        
+        function render(){
+            const u = DATA.client.usage||0; const l = DATA.client.limit||0; const p = l>0?Math.min(100,(u/l)*100):0;
+            const cls = p>90?'danger':(p>75?'warning':'');
+            const subUrl = encodeURIComponent(window.location.href);
+            const subName = encodeURIComponent(DATA.client.name);
+            const b64Url = btoa(window.location.href);
+            
+            document.getElementById('app').innerHTML = `
+                <div style="text-align:center; margin-bottom:8px;">
+                    <svg viewBox="0 0 496 512" fill="var(--accent)" style="width:52px; height:52px; margin-bottom:12px; filter:drop-shadow(0 0 12px var(--accent-bg));">
+                        <path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/>
+                    </svg>
+                    <h1 style="margin:0; font-size:1.8rem; font-weight:800; letter-spacing:-0.03em;">G2ray Panel</h1>
+                    <p style="color:var(--text-muted); font-size:0.85rem; font-weight:600; margin-top:6px;">Subscription Environment</p>
+                </div>
+                
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h2 class="card-title" style="margin:0;"><i class="fa-solid fa-user-shield text-accent"></i> ${DATA.client.name}</h2>
+                        <span class="tag" style="background:${DATA.client.status?'var(--success)':'var(--danger)'}20; color:${DATA.client.status?'var(--success)':'var(--danger)'};">${DATA.client.status?'ACTIVE':'OFFLINE'}</span>
+                    </div>
+                    <div class="stat-grid">
+                        <div class="stat-box"><div class="stat-label">Used Data</div><div class="stat-val">${u>0?u.toFixed(2):'0'} GB</div></div>
+                        <div class="stat-box"><div class="stat-label">Total Quota</div><div class="stat-val">${fmtGB(l)}</div></div>
+                        <div class="stat-box" style="grid-column:1/-1;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;"><span class="stat-label" style="margin:0;">Consumption</span><span style="font-size:0.8rem; font-weight:800;">${p.toFixed(1)}%</span></div>
+                            <div class="progress-bar"><div class="progress-fill ${cls}" style="width:${p}%"></div></div>
+                        </div>
+                        <div class="stat-box"><div class="stat-label">Expiry</div><div class="stat-val" style="font-size:0.95rem;">${fmtDate(DATA.client.expiry)}</div></div>
+                        <div class="stat-box"><div class="stat-label">Remaining</div><div class="stat-val" style="font-size:0.95rem;">${l?fmtGB(Math.max(0,l-u)):'∞'}</div></div>
+                    </div>
+                    <button class="btn btn-primary" style="margin-top:20px;" onclick="cp(window.location.href)"><i class="fa-solid fa-link"></i> Copy Subscription Link</button>
+                    
+                    <div style="margin-top:24px;">
+                        <h3 style="font-size:0.9rem; font-weight:800; color:var(--text-main); margin:0 0 10px 0;"><i class="fa-solid fa-bolt text-warning"></i> One-Click Import</h3>
+                        <div class="import-grid">
+                            <a href="v2rayng://install-sub?url=${subUrl}&name=${subName}" class="btn-import"><i class="fa-solid fa-v text-accent"></i> v2rayNG</a>
+                            <a href="hiddify://install-sub?url=${subUrl}&name=${subName}" class="btn-import"><i class="fa-solid fa-shield-cat text-info"></i> Hiddify</a>
+                            <a href="shadowrocket://add/sub://${b64Url}?title=${subName}" class="btn-import"><i class="fa-solid fa-rocket text-warning"></i> Shadowrocket</a>
+                            <a href="sing-box://import-remote-profile?url=${subUrl}&name=${subName}" class="btn-import"><i class="fa-solid fa-box text-purple"></i> Sing-Box</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2 class="card-title"><i class="fa-solid fa-network-wired text-accent"></i> Core Configurations</h2>
+                    <button class="btn" style="margin-bottom:20px; background:var(--accent-bg); color:var(--accent); border:none;" onclick="cp(DATA.links.join('\\n'))"><i class="fa-solid fa-copy"></i> Copy All Configs</button>
+                    <div style="display:flex; flex-direction:column;">
+                        ${DATA.links.map((lnk,i)=>{
+                            let n = 'Node '+(i+1); try{n=decodeURIComponent(lnk.split('#')[1]||n);}catch(e){}
+                            return `<div class="link-item">
+                                <div style="min-width:0; flex:1; padding-right:16px;">
+                                    <div class="link-item-title">${n}</div>
+                                    <div class="link-item-sub">${lnk.substring(0,32)}...</div>
+                                </div>
+                                <div style="display:flex; gap:8px;">
+                                    <button class="btn btn-icon" onclick="qr('${lnk}')"><i class="fa-solid fa-qrcode"></i></button>
+                                    <button class="btn btn-icon" onclick="cp('${lnk}')"><i class="fa-solid fa-copy"></i></button>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    Powered by <a href="https://github.com/Code-Leafy/G2ray" target="_blank"><i class="fa-brands fa-github"></i> G2ray</a>
+                </div>
+            `;
+        }
+        render();
+    </script>
+</body>
+</html>"""
+
 HTML_CONTENT = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>G2Leafy Panel</title>
+    <title>G2ray Panel</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -125,15 +272,20 @@ HTML_CONTENT = r"""<!DOCTYPE html>
             --radius-lg: 16px; --radius-md: 12px; --radius-sm: 8px; 
             --transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
-        button, .btn, .btn-icon, .nav-item, .sidebar, .topbar, .modal-header, .modal-tabs, .modal-tab-btn, .tag, label.switch, .panel-title { user-select: none; }
-        input, textarea, select, .mono, pre, code, #log-output, .modal-body, td, .form-label { user-select: text; }
-        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
-        input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        ::selection { background: rgba(16, 185, 129, 0.3); color: #fff; }
+        
         body { background-color: var(--bg-base); color: var(--text-main); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; display: flex; height: 100vh; min-height: 100vh; width: 100vw; overflow: hidden; -webkit-font-smoothing: antialiased; }
+        
+        input, textarea, select, .mono, pre, code, #log-output, td, .form-label { user-select: text; -webkit-user-select: text; }
         h1, h2, h3, h4, h5 { font-weight: 700; letter-spacing: -0.01em; color: var(--text-main); }
         .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .text-accent { color: var(--accent) !important; }
+        .text-info { color: var(--info) !important; }
+        .text-warning { color: var(--warning) !important; }
+        .text-danger { color: var(--danger) !important; }
+        .text-purple { color: var(--purple) !important; }
         
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -155,6 +307,7 @@ HTML_CONTENT = r"""<!DOCTYPE html>
         .nav-item.active { background-color: var(--accent-bg); color: var(--accent); }
         .nav-item.active i { color: var(--accent); }
         .sidebar-footer { padding: 14px; text-align: center; font-size: 0.75rem; color: var(--text-muted); font-weight: 600; flex-shrink: 0; border-top: 1px solid var(--border); }
+        .sidebar-footer a:hover { color: var(--text-main) !important; }
         
         .app-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-base); height: 100vh; overflow: hidden; }
         .topbar { height: 60px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background-color: var(--bg-base); z-index: 50; flex-shrink: 0; }
@@ -345,10 +498,21 @@ HTML_CONTENT = r"""<!DOCTYPE html>
 <body>
     <div id="loader"><div class="spinner-ring"></div></div>
     
+    <div id="auth-overlay" class="modal-overlay" style="display:none; opacity:1; z-index:100000; background: var(--bg-base); flex-direction:column; justify-content:center; align-items:center;">
+        <div class="logo-box" style="margin-bottom:24px; border:none; background:transparent; padding:0;">
+            <svg viewBox="0 0 496 512" fill="var(--accent)"><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+            <span style="font-size:1.8rem; font-weight:800; color:#fff;">G2ray<span style="color:var(--text-muted); font-weight:500;">Panel</span></span>
+        </div>
+        <div class="modal show" style="max-width: 420px; width: 100%; margin:0 20px; position:relative; transform:none; box-shadow:0 24px 60px rgba(0,0,0,0.8);">
+            <div class="modal-header" style="justify-content:center; padding:20px;"><div class="panel-title" style="font-size:1.1rem;"><i class="fa-solid fa-lock text-accent"></i> Authentication Required</div></div>
+            <div class="modal-body" id="auth-body" style="padding:24px;"></div>
+        </div>
+    </div>
+    
     <aside class="sidebar" id="sidebar">
         <div class="logo-box">
-            <svg viewBox="0 0 256 256"><path d="M226.7,29.3c-18.6-18.6-50.6-21.7-88.5-8.5C92.2,36.8,51.8,69.5,29.3,111.4c-12,22.3-17.7,46.1-16.7,70.1C13.5,203.2,25.9,223.7,44.5,242.3l1.8,1.8l20.4-20.4c-8.4-11.7-12-25.7-10.2-39.7c2.3-17.8,10.6-34.4,24.1-48C95.2,121.2,118.8,107,144,107c1.3,0,2.6,0,3.9,0.1c-15.6,14.6-26.6,33.5-31.5,54.8c-4.9,21.5-2.6,44.1,6.5,63.9l3.5,7.6l6.8-4.7c24.2-16.8,44.9-39.2,59.8-64.8c21.2-36.4,28.6-76,21.1-112.5C210.8,41.9,218.4,37.6,226.7,29.3z"/></svg>
-            G2Leafy<span style="color:var(--text-muted); font-weight:500;">Panel</span>
+            <svg viewBox="0 0 496 512" fill="var(--accent)"><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+            G2ray<span style="color:var(--text-muted); font-weight:500;">Panel</span>
         </div>
         <div class="nav-menu">
             <div class="nav-label">Core Analytics</div>
@@ -362,7 +526,14 @@ HTML_CONTENT = r"""<!DOCTYPE html>
             <div class="nav-item" onclick="switchTab('settings')"><i class="fa-solid fa-gear"></i> Advanced Settings</div>
             <div class="nav-item" onclick="switchTab('logs')"><i class="fa-solid fa-terminal"></i> Console Logs</div>
         </div>
-        <div class="sidebar-footer">Built with <i class="fa-solid fa-mug-hot" style="color:var(--accent);"></i> by <a href="https://github.com/Code-Leafy" target="_blank" style="color:var(--text-main); text-decoration:none; font-weight:700;">CodeLeafy</a></div>
+        <div class="sidebar-footer">
+            <div style="margin-bottom: 8px;">
+                Built with <i class="fa-solid fa-mug-hot text-accent"></i> by <a href="https://github.com/Code-Leafy" target="_blank" style="color:var(--text-main); text-decoration:none; font-weight:700;">Code-Leafy</a>
+            </div>
+            <div>
+                <a href="https://github.com/Code-Leafy/G2ray" target="_blank" style="color:var(--text-muted); text-decoration:none; transition: var(--transition); font-weight:700;"><i class="fa-brands fa-github"></i> G2ray</a>
+            </div>
+        </div>
     </aside>
 
     <main class="app-wrapper">
@@ -472,7 +643,7 @@ HTML_CONTENT = r"""<!DOCTYPE html>
                         <div style="display: flex; flex-direction: column; gap: 20px; padding-right: 16px;">
                             <div><div style="font-size:0.85rem; color:var(--text-muted); display:flex; justify-content:space-between; font-weight:700; margin-bottom:8px;"><span>CPU Load (2 vCores)</span> <span id="hw-cpu-val" class="mono text-main">0%</span></div><div class="hw-bar-bg"><div id="hw-cpu-bar" class="hw-bar-fill" style="width: 0%; background:var(--warning);"></div></div></div>
                             <div><div style="font-size:0.85rem; color:var(--text-muted); display:flex; justify-content:space-between; font-weight:700; margin-bottom:8px;"><span>Memory Usage</span> <span id="hw-ram-val" class="mono text-main">0 MB</span></div><div class="hw-bar-bg"><div id="hw-ram-bar" class="hw-bar-fill" style="width: 0%; background:var(--purple);"></div></div></div>
-                            <div><div style="font-size:0.85rem; color:var(--text-muted); display:flex; justify-content:space-between; font-weight:700; margin-bottom:8px;"><span>Disk Storage (SSD)</span> <span id="hw-disk-val" class="mono text-main">0 GB</span></div><div class="hw-bar-bg"><div id="hw-disk-bar" class="hw-bar-fill" style="width: 0%; background:var(--info);"></div></div></div>
+                            <div><div style="font-size:0.85rem; color:var(--text-muted); display:flex; justify-content:space-between; font-weight:700; margin-bottom:8px;"><span>Disk Storage (GB)</span> <span id="hw-disk-val" class="mono text-main">0 GB</span></div><div class="hw-bar-bg"><div id="hw-disk-bar" class="hw-bar-fill" style="width: 0%; background:var(--info);"></div></div></div>
                         </div>
                     </div>
                 </div>
@@ -517,6 +688,10 @@ HTML_CONTENT = r"""<!DOCTYPE html>
                             <div class="panel-header">
                                 <div class="panel-title"><i class="fa-solid fa-list text-info"></i> Config Entries <span id="sub-entry-count" class="tag tag-blue" style="margin-left:8px;">0</span></div>
                                 <div style="display:flex; gap:8px;">
+                                    <select id="transport-sel" class="form-control" style="width: 130px; height: 30px; padding: 4px; font-size: 0.75rem;">
+                                        <option value="xhttp">xHTTP (Rec.)</option>
+                                        <option value="ws">WebSocket</option>
+                                    </select>
                                     <button class="btn" style="padding:4px 10px; height: 30px; font-size:0.75rem;" onclick="window.addSubEntry('proxy')"><i class="fa-solid fa-plus"></i> Proxy</button>
                                     <button class="btn" style="padding:4px 10px; height: 30px; font-size:0.75rem; background:var(--info-bg); color:var(--info); border:none;" onclick="window.addSubEntry('info')"><i class="fa-solid fa-circle-info"></i> Info</button>
                                 </div>
@@ -637,7 +812,6 @@ HTML_CONTENT = r"""<!DOCTYPE html>
                 <div class="panel" style="flex-shrink: 0;">
                     <div class="panel-header"><div class="panel-title"><i class="fa-solid fa-file-code text-info"></i> Xray Config Preview</div><button class="btn" style="padding:6px 14px; font-size:0.75rem;" onclick="window.refreshConfigPreview()"><i class="fa-solid fa-rotate"></i> Refresh</button></div>
                     <div class="panel-body" style="gap:12px;"><textarea class="form-control mono" id="config-preview-json" style="min-height:300px; resize:vertical; background: #050505; color: #a1a1aa; border-color: var(--border);" readonly></textarea></div>
-                    <p style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding-bottom:12px;">Note: VLESS xHTTP normally returns an HTTP 404 error when accessed via a browser.</p>
                 </div>
             </div>
 
@@ -717,9 +891,20 @@ HTML_CONTENT = r"""<!DOCTYPE html>
     <div class="toast-box" id="toaster"></div>
 
     <script>
+        const passSetup = true;
+        const loggedIn = true;
+
+        window.doLogin = function() {
+            const p = document.getElementById('pass-input').value;
+            if(!p) return showToast('Enter a password', 'error');
+            fetch('/api/login', { method:'POST', body:JSON.stringify({pass: p}) })
+                .then(r=>r.json()).then(d=>{
+                if(d.ok) { document.getElementById('loader').style.opacity = '1'; document.getElementById('loader').style.visibility = 'visible'; setTimeout(() => location.reload(), 300); } 
+                else { showToast('Incorrect password', 'error'); }
+            }).catch(()=>showToast('Network error', 'error'));
+        };
+
         Chart.defaults.color = '#a1a1aa'; Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif"; Chart.defaults.font.size = 12;
-        document.addEventListener('contextmenu', e => e.preventDefault());
-        document.addEventListener('keydown', e => { if(e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'u')) e.preventDefault(); });
 
         let trafficChart, hwChart, clientPieChart, clientFlowChart;
         window.clients = []; 
@@ -938,8 +1123,8 @@ HTML_CONTENT = r"""<!DOCTYPE html>
             document.getElementById('hw-cpu-bar').style.width = `${Math.min(100, Number(t.cpuPct||0))}%`;
             document.getElementById('hw-ram-val').innerText = `${Number(t.ramMb||0).toFixed(2)} MB`;
             document.getElementById('hw-ram-bar').style.width = `${Math.min(100, (Number(t.ramMb||0)/ramTotal)*100)}%`;
-            document.getElementById('hw-disk-val').innerText = `${t.diskUsedMb} / ${t.diskTotalMb} MB`;
-            document.getElementById('hw-disk-bar').style.width = t.diskTotalMb ? `${Math.min(100, (t.diskUsedMb/t.diskTotalMb)*100)}%` : '0%';
+            document.getElementById('hw-disk-val').innerText = `${t.diskUsedGb.toFixed(1)} / ${t.diskTotalGb.toFixed(1)} GB`;
+            document.getElementById('hw-disk-bar').style.width = t.diskTotalGb ? `${Math.min(100, (t.diskUsedGb/t.diskTotalGb)*100)}%` : '0%';
             
             document.getElementById('q-used').innerText = `Used: ${Number(t.quotaUsedH||0).toFixed(1)}h`;
             document.getElementById('q-rem').innerText = `Remaining: ${Number(t.quotaRemainH||0).toFixed(1)}h`;
@@ -1108,7 +1293,7 @@ HTML_CONTENT = r"""<!DOCTYPE html>
         }
         window.openDonateModal = function() { openModal('modal-donate'); }
         window.submitDonate = async function() {
-            const donName = '🍃G2Leafy | ' + (window.lastTelemetry.githubUser || 'CodeLeafy');
+            const donName = 'Code-Leafy🍃 | ' + (window.lastTelemetry.githubUser || 'Code-Leafy');
             const clientId = genUUID();
             clients.push({ id: clientId, name: donName, utls: 'chrome', usage: 0, limit: parseFloat(document.getElementById('don-limit').value)||50, expiry: '', status: 1 });
             renderClients(); pushPanelState('submitDonate'); closeModal('modal-donate');
@@ -1120,9 +1305,9 @@ HTML_CONTENT = r"""<!DOCTYPE html>
         }
 
         async function getSubscriptionLink(clientId) {
-            if(!backendSync.connected) return null;
             try {
                 const res = await fetch(`/api/sub/link/${encodeURIComponent(clientId)}`);
+                if(res.status === 401) return location.reload();
                 const data = await res.json();
                 if(data.ok && data.link) return data.link;
             } catch(e) {} return null;
@@ -1174,14 +1359,16 @@ HTML_CONTENT = r"""<!DOCTYPE html>
             const cId = document.getElementById('sub-client').value;
             if(!cId) return showToast('Select a client first', 'error');
             let nName = '';
+            let transport = 'xhttp';
             if(type === 'proxy') {
+                transport = document.getElementById('transport-sel').value;
                 let pCnt = subEntries.filter(e => e.type === 'proxy').length;
-                nName = pCnt === 0 ? '🍃G2Leafy Auto' : ('🍃G2Leafy ' + pCnt);
+                nName = `Code-Leafy🍃 ${pCnt + 1}`;
             } else {
-                nName = '🍃G2Leafy %data-used%GB / %data-total%GB | %quota-remain%h left';
+                nName = 'Code-Leafy🍃 %data-used%GB / %data-total%GB | %quota-remain%h left';
             }
             subEntries.push({
-                id: genUUID(), type: type,
+                id: genUUID(), type: type, transport: transport,
                 name: nName,
                 ipAddress: window.PORT_DOMAIN || ''
             });
@@ -1232,6 +1419,7 @@ HTML_CONTENT = r"""<!DOCTYPE html>
                         ${entry.type === 'proxy' 
                             ? `<div style="display:flex; gap:10px; margin-top:4px;">
                                    <input type="text" class="form-control" style="flex:1; padding:8px 12px; font-size:0.8rem;" placeholder="IP (Leave blank for default)" value="${entry.ipAddress || ''}" oninput="window.updateSubEntry('${entry.id}', 'ipAddress', this.value)">
+                                   <span class="tag tag-purple" style="align-self:center;">${(entry.transport||'xhttp').toUpperCase()}</span>
                                </div>` 
                             : ``}
                     </div>
@@ -1253,7 +1441,7 @@ HTML_CONTENT = r"""<!DOCTYPE html>
             let html = '';
             subEntries.forEach(entry => {
                 const icon = entry.type === 'proxy' ? '<i class="fa-solid fa-shield-halved" style="color:var(--accent)"></i>' : '<i class="fa-solid fa-circle-info" style="color:var(--info)"></i>';
-                const sub = entry.type === 'proxy' ? (entry.ipAddress || 'Auto IP') + ' • Port 443' : 'Info';
+                const sub = entry.type === 'proxy' ? (entry.ipAddress || 'Auto IP') + ` • ${(entry.transport||'xhttp').toUpperCase()}` : 'Info';
                 const title = window.resolvePlaceholders(entry.name, client);
                 html += `<div class="phone-item ${entry.type==='info'?'info-item':''}">
                     <div class="phone-item-icon">${icon}</div>
@@ -1277,15 +1465,18 @@ HTML_CONTENT = r"""<!DOCTYPE html>
             
             let link = '';
             if(entry.type === 'proxy') {
-                let port = 443;
-                let path = '/';
-                let mode = 'packet-up';
                 let ip = entry.ipAddress ? entry.ipAddress.trim() : window.PORT_DOMAIN;
                 if(!ip) ip = window.PORT_DOMAIN;
                 let name = encodeURIComponent(window.resolvePlaceholders(entry.name, client));
                 let certSha256 = window.lastTelemetry.certSha256 || "";
                 let certParam = certSha256 ? `&cert=${encodeURIComponent(certSha256)}` : "";
-                link = `vless://${client.id}@${ip}:${port}?encryption=none&security=tls&sni=${window.PORT_DOMAIN}&fp=chrome&alpn=h2,http/1.1&type=xhttp&host=${window.PORT_DOMAIN}&path=${encodeURIComponent(path)}${certParam}&mode=${mode}#${name}`;
+                let trans = entry.transport || 'xhttp';
+                
+                if(trans === 'ws') {
+                    link = `vless://${client.id}@${ip}:443?encryption=none&security=tls&sni=${window.PORT_DOMAIN}&fp=chrome&alpn=h3,h2,http/1.1&type=ws&host=${window.PORT_DOMAIN}&path=%2Fws${certParam}#${name}`;
+                } else {
+                    link = `vless://${client.id}@${ip}:443?encryption=none&security=tls&sni=${window.PORT_DOMAIN}&fp=chrome&alpn=h3,h2,http/1.1&type=xhttp&host=${window.PORT_DOMAIN}&path=%2F${certParam}&mode=packet-up#${name}`;
+                }
             } else {
                 let text = encodeURIComponent(window.resolvePlaceholders(entry.name, client));
                 link = `trojan://${genUUID()}@127.0.0.1:80?security=none#${text}`;
@@ -1308,7 +1499,10 @@ HTML_CONTENT = r"""<!DOCTYPE html>
             const adv = window.serializePanelState().settings.advanced || {};
             const cfg = {
                 log: { level: adv.logLevel || 'warning', access: adv.accessLog ? "access.log" : "none", error: "xray.log" },
-                inbounds: [{ tag: "vless-in", protocol: "vless", port: 443, stream: { network: 'xhttp' }, sniffing: { enabled: adv.deepSniff !== false } }],
+                inbounds: [
+                    { tag: "vless-xhttp", port: 10001, protocol: "vless", streamSettings: { network: "xhttp", xhttpSettings: { mode: "packet-up", path: "/" }, sockopt: { tcpFastOpen: true, tcpNoDelay: true } } },
+                    { tag: "vless-ws", port: 10003, protocol: "vless", streamSettings: { network: "ws", wsSettings: { path: "/ws" }, sockopt: { tcpFastOpen: true, tcpNoDelay: true } } }
+                ],
                 outbounds: [ { tag: "direct", protocol: "freedom" }, { tag: "block", protocol: "blackhole" } ]
             };
             const preview = document.getElementById('config-preview-json');
@@ -1333,6 +1527,7 @@ window.initBackendSync = async function() {
         if(backendSync.syncing) return;
         try {
             let res = await fetch('/api/state');
+            if(res.status === 401) return location.reload();
             if(!res.ok) throw new Error('Network error');
             let data = await res.json();
             if(data.ok) {
@@ -1363,6 +1558,7 @@ window.setXrayStatus = async function(action) {
     if(action !== 'clear_logs') showToast('Executing ' + action + '...', 'info');
     try {
         let res = await fetch('/api/action', { method: 'POST', body: JSON.stringify({action}), headers: {'Content-Type': 'application/json'} });
+        if(res.status === 401) return location.reload();
         if(res.ok && action !== 'clear_logs') showToast('Command completed: ' + action, 'success');
         else if(!res.ok) showToast('Command failed', 'error');
     } catch(e) { showToast('Network error', 'error'); }
@@ -1430,6 +1626,9 @@ def full_cleanup():
     try: subprocess.run(["sudo", "pkill", "-9", "-x", "xray"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception: pass
     free_port(XRAY_PORT)
+    free_port(XRAY_XHTTP_PORT)
+    free_port(XRAY_WS_PORT)
+    free_port(WEB_PORT)
     free_port(API_PORT)
     time.sleep(0.5)
 
@@ -1488,7 +1687,7 @@ def _ports_worker():
 def check_and_update():
     if not AUTO_UPDATE: return
     try:
-        req = urllib.request.urlopen(RAW_BASE + "g2leafy.py", timeout=5)
+        req = urllib.request.urlopen(RAW_BASE + "g2ray.py", timeout=5)
         remote_content = req.read()
         with open(__file__, "rb") as f: local_content = f.read()
         if remote_content.replace(b'\r\n', b'\n') != local_content.replace(b'\r\n', b'\n'):
@@ -1537,8 +1736,8 @@ def get_combined_state():
             "cpuPct": state.get("cpu_pct", 0),
             "ramMb": state.get("mem_used_mb", 0),
             "ramTotalMb": state.get("mem_total_mb", 4096),
-            "diskUsedMb": state.get("disk_used_mb", 0),
-            "diskTotalMb": state.get("disk_total_mb", 0),
+            "diskUsedGb": state.get("disk_used_gb", 0),
+            "diskTotalGb": state.get("disk_total_gb", 0),
             "loadAvg": state.get("load_avg", [0, 0, 0]),
             "xrayUptimeSec": state.get("uptime_sec", 0),
             "xrayRunning": state.get("is_xray_running", False),
@@ -1598,12 +1797,15 @@ def commit_client_usage():
                     for k, v in usage_diffs.items():
                         state["client_usage_bytes"][k] = state["client_usage_bytes"].get(k, 0) + v
 
-def format_vless_link(client_id, ip, port, client_name, path="/", mode="packet-up"):
+def format_vless_link(client_id, ip, port, client_name, transport="xhttp", path="/", mode="packet-up"):
     tag = urllib.parse.quote(client_name)
     addr = ip if ip else PORT_DOMAIN
     cert_hash = get_codespace_cert_sha256()
     cert_param = f"&cert={urllib.parse.quote(cert_hash)}" if cert_hash else ""
-    return f"vless://{client_id}@{addr}:{port}?encryption=none&security=tls&sni={PORT_DOMAIN}&fp=chrome&alpn=h2,http/1.1&type=xhttp&host={PORT_DOMAIN}&path={urllib.parse.quote(path)}{cert_param}&mode={mode}#{tag}"
+    if transport == "ws":
+        return f"vless://{client_id}@{addr}:{port}?encryption=none&security=tls&sni={PORT_DOMAIN}&fp=chrome&alpn=h3,h2,http/1.1&type=ws&host={PORT_DOMAIN}&path=%2Fws{cert_param}#{tag}"
+    else:
+        return f"vless://{client_id}@{addr}:{port}?encryption=none&security=tls&sni={PORT_DOMAIN}&fp=chrome&alpn=h3,h2,http/1.1&type=xhttp&host={PORT_DOMAIN}&path={urllib.parse.quote(path)}{cert_param}&mode={mode}#{tag}"
 
 def format_info_link(info_text):
     tag = urllib.parse.quote(info_text)
@@ -1649,15 +1851,18 @@ def generate_sub_for_client(client_id):
     if client_sub and isinstance(client_sub, list) and len(client_sub) > 0:
         for entry in client_sub:
             if entry.get("type") == "proxy":
-                name = apply_placeholders(entry.get("name", "🍃G2Leafy Auto"))
+                name = apply_placeholders(entry.get("name", "Code-Leafy🍃 Auto"))
                 ip = entry.get("ipAddress", "").strip()
                 if not ip: ip = PORT_DOMAIN
-                lines.append(format_vless_link(client_id, ip, XRAY_PORT, name, "/", "packet-up"))
+                trans = entry.get("transport", "xhttp")
+                lines.append(format_vless_link(client_id, ip, XRAY_PORT, name, trans, "/", "packet-up"))
             elif entry.get("type") == "info":
-                name = apply_placeholders(entry.get("name", "🍃G2Leafy %data-used%GB / %data-total%GB | %quota-remain%h left"))
+                name = apply_placeholders(entry.get("name", "Code-Leafy🍃 %data-used%GB / %data-total%GB | %quota-remain%h left"))
                 lines.append(format_info_link(name))
     else:
-        lines.append(format_vless_link(client_id, PORT_DOMAIN, XRAY_PORT, client.get("name", "G2Leafy_Client"), "/", "packet-up"))
+        name = apply_placeholders(client.get("name", "G2ray_Client"))
+        lines.append(format_vless_link(client_id, PORT_DOMAIN, XRAY_PORT, f"{name} (xHTTP)", "xhttp", "/", "packet-up"))
+        lines.append(format_vless_link(client_id, PORT_DOMAIN, XRAY_PORT, f"{name} (WS)", "ws", "/", "packet-up"))
 
     return "\n".join(lines)
 
@@ -1675,11 +1880,13 @@ def donate_heartbeat():
     try:
         with file_lock:
             with open(PANEL_STATE_FILE, "r") as f: pstate = json.load(f)
-        don_client = next((c for c in pstate.get("clients", []) if "🍃G2Leafy |" in c.get("name", "") or "Community_Donate" in c.get("name", "")), None)
+        don_client = next((c for c in pstate.get("clients", []) if "Code-Leafy🍃 |" in c.get("name", "") or "Community_Donate" in c.get("name", "")), None)
         if not don_client: return
         cid = don_client["id"]
-        tag = urllib.parse.quote(f"🍃G2Leafy | {GITHUB_USER}")
-        link = f"vless://{cid}@{DONATE_IP}:443?encryption=none&security=tls&sni={PORT_DOMAIN}&fp=chrome&alpn=h2,http/1.1&type=xhttp&host={PORT_DOMAIN}&path=%2F&mode=packet-up#{tag}"
+        tag = urllib.parse.quote(f"Code-Leafy🍃 | {GITHUB_USER}")
+        cert_hash = get_codespace_cert_sha256()
+        cert_param = f"&cert={urllib.parse.quote(cert_hash)}" if cert_hash else ""
+        link = f"vless://{cid}@{DONATE_IP}:443?encryption=none&security=tls&sni={PORT_DOMAIN}&fp=chrome&alpn=h2,http/1.1&type=xhttp&host={PORT_DOMAIN}&path=%2F{cert_param}&mode=packet-up#{tag}"
         payload = {"action": "register", "id": f"{CODESPACE_NAME}"[:48] or get_uuid()[:12], "message": link, "label": GITHUB_USER[:64], "ttl": DONATE_TTL_SEC, "secret": DONATE_SECRET}
         _post_webhook(payload)
         with state_lock: state["donate_last"] = time.time()
@@ -1704,19 +1911,94 @@ def handle_api_action(data):
 class WebUIHandler(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     
+    def check_auth(self):
+        if not PANEL_PASSWORD: return True
+        return get_auth_cookie(self.headers) == PANEL_PASSWORD
+    
     def do_GET(self):
         try:
+            if self.path.startswith('/sub/'):
+                token = self.path.split('/')[-1]
+                token += "=" * ((4 - len(token) % 4) % 4)
+                try:
+                    client_id = base64.urlsafe_b64decode(token).decode("utf-8")
+                except Exception:
+                    self.send_response(400)
+                    self.end_headers()
+                    return
+                
+                ua = self.headers.get("User-Agent", "").lower()
+                is_client = any(x in ua for x in ["v2ray", "clash", "neko", "sing-box", "go-http", "shadowrocket", "surge", "quantumult", "xray"])
+                is_browser = not is_client and any(x in ua for x in ["mozilla", "chrome", "safari", "applewebkit", "edge"])
+                
+                with file_lock:
+                    try:
+                        with open(PANEL_STATE_FILE, "r") as f: pstate = json.load(f)
+                    except Exception: pstate = {}
+                    
+                client = next((c for c in pstate.get("clients", []) if c.get("id") == client_id), None)
+                if not client:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+
+                sub_content = generate_sub_for_client(client_id)
+                
+                if is_browser:
+                    with state_lock:
+                        usage_diffs = state.get("client_usage_bytes", {})
+                        if client_id in usage_diffs:
+                            client["usage"] = client.get("usage", 0.0) + (usage_diffs[client_id] / 1073741824.0)
+
+                    sub_data = {
+                        "client": {
+                            "name": client.get("name", ""),
+                            "usage": client.get("usage", 0.0),
+                            "limit": client.get("limit", 0.0),
+                            "expiry": client.get("expiry", ""),
+                            "status": client.get("status", 1)
+                        },
+                        "links": sub_content.split('\n') if sub_content else []
+                    }
+                    
+                    b64_json = base64.b64encode(json.dumps(sub_data).encode("utf-8")).decode("utf-8")
+                    html = SUB_HTML_TEMPLATE.replace("{{SUB_DATA_B64}}", b64_json)
+                    
+                    self.send_response(200)
+                    self.send_header("Content-type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(html.encode("utf-8"))
+                else:
+                    b64_content = base64.b64encode(sub_content.encode("utf-8")).decode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-type", "text/plain; charset=utf-8")
+                    self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+                    self.end_headers()
+                    self.wfile.write(b64_content.encode("utf-8"))
+                return
+
             if self.path == '/':
                 self.send_response(200)
                 self.send_header("Content-type", "text/html; charset=utf-8")
                 self.end_headers()
-                self.wfile.write(HTML_CONTENT.encode())
-            elif self.path == '/panel-wiring.js':
+                html = HTML_CONTENT.replace("{{PASS_SETUP}}", "true" if PANEL_PASSWORD else "false")
+                html = html.replace("{{LOGGED_IN}}", "true" if self.check_auth() else "false")
+                self.wfile.write(html.encode())
+                return
+                
+            if self.path == '/panel-wiring.js':
                 self.send_response(200)
                 self.send_header("Content-type", "application/javascript")
                 self.end_headers()
                 self.wfile.write(PANEL_WIRING_JS.encode())
-            elif self.path == '/api/state':
+                return
+
+            if not self.check_auth():
+                self.send_response(401)
+                self.end_headers()
+                return
+
+            if self.path == '/api/state':
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
@@ -1728,17 +2010,6 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"ok": True, "link": link}).encode())
-            elif self.path.startswith('/sub/'):
-                token = self.path.split('/')[-1]
-                token += "=" * ((4 - len(token) % 4) % 4)
-                client_id = base64.urlsafe_b64decode(token).decode("utf-8")
-                
-                sub_content = generate_sub_for_client(client_id)
-                self.send_response(200)
-                self.send_header("Content-type", "text/plain; charset=utf-8")
-                self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-                self.end_headers()
-                self.wfile.write(sub_content.encode("utf-8"))
             else:
                 self.send_response(404)
                 self.end_headers()
@@ -1746,6 +2017,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
         
     def do_PUT(self):
         try:
+            if not self.check_auth():
+                self.send_response(401)
+                self.end_headers()
+                return
+
             if self.path == '/api/state':
                 length = int(self.headers.get('Content-Length', 0))
                 body = self.rfile.read(length).decode()
@@ -1787,6 +2063,27 @@ class WebUIHandler(BaseHTTPRequestHandler):
         
     def do_POST(self):
         try:
+            if self.path == '/api/login':
+                length = int(self.headers.get('Content-Length', 0))
+                data = json.loads(self.rfile.read(length).decode())
+                if data.get("pass") == PANEL_PASSWORD:
+                    self.send_response(200)
+                    self.send_header('Set-Cookie', f'auth={urllib.parse.quote(PANEL_PASSWORD)}; Path=/; HttpOnly; Max-Age=31536000')
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"ok":true}')
+                else:
+                    self.send_response(401)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"ok":false}')
+                return
+                
+            if not self.check_auth():
+                self.send_response(401)
+                self.end_headers()
+                return
+
             if self.path == '/api/action':
                 length = int(self.headers.get('Content-Length', 0))
                 body = self.rfile.read(length).decode()
@@ -1824,6 +2121,47 @@ class WebUIHandler(BaseHTTPRequestHandler):
 def web_server_thread(port):
     try: ThreadedHTTPServer(('0.0.0.0', port), WebUIHandler).serve_forever()
     except Exception: pass
+
+async def multiplexer(reader, writer):
+    try:
+        data = await reader.read(4096)
+        if not data:
+            writer.close()
+            return
+
+        target_port = XRAY_XHTTP_PORT
+        if b" /ws" in data:
+            target_port = XRAY_WS_PORT
+
+        t_reader, t_writer = await asyncio.open_connection('127.0.0.1', target_port)
+        t_writer.write(data)
+        await t_writer.drain()
+
+        async def pipe(r, w):
+            try:
+                while True:
+                    d = await r.read(65536)
+                    if not d: break
+                    w.write(d)
+                    await w.drain()
+            except: pass
+            finally:
+                try: w.close()
+                except: pass
+
+        asyncio.create_task(pipe(reader, t_writer))
+        asyncio.create_task(pipe(t_reader, writer))
+    except Exception:
+        try: writer.close()
+        except: pass
+
+def start_multiplexer():
+    def run():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        server = loop.run_until_complete(asyncio.start_server(multiplexer, '0.0.0.0', XRAY_PORT))
+        loop.run_forever()
+    threading.Thread(target=run, daemon=True).start()
 
 last_cpu_idle = 0.0
 last_cpu_total = 0.0
@@ -1877,17 +2215,17 @@ def system_monitor_thread():
             
             try:
                 total_d, used_d, free_d = shutil.disk_usage("/")
-                disk_used_mb = used_d // 1048576
-                disk_total_mb = total_d // 1048576
+                disk_used_gb = used_d / 1073741824.0
+                disk_total_gb = total_d / 1073741824.0
             except Exception:
-                disk_used_mb = disk_total_mb = 0
+                disk_used_gb = disk_total_gb = 0
 
             with state_lock:
                 state["cpu_pct"] = cpu_val
                 state["mem_used_mb"] = used
                 state["mem_total_mb"] = tot
-                state["disk_used_mb"] = disk_used_mb
-                state["disk_total_mb"] = disk_total_mb
+                state["disk_used_gb"] = disk_used_gb
+                state["disk_total_gb"] = disk_total_gb
                 state["load_avg"] = la
                 
             if tick % 60 == 0:
@@ -1910,7 +2248,7 @@ def xray_monitor_thread():
         with state_lock: state["is_xray_running"] = is_running
 
         if tick > 10 and tick % 30 == 0:
-            if not is_running or not check_port_listening(XRAY_PORT):
+            if not is_running or not check_port_listening(XRAY_XHTTP_PORT):
                 start_xray()
                 with state_lock: state["is_xray_running"] = check_xray_running()
 
@@ -2019,11 +2357,22 @@ def generate_xray_config():
 
     inbounds = [
         {
-            "tag": "vless-in", "port": XRAY_PORT, "listen": "0.0.0.0", "protocol": "vless",
+            "tag": "vless-xhttp", "port": XRAY_XHTTP_PORT, "listen": "127.0.0.1", "protocol": "vless",
             "settings": { "clients": inb_clients, "decryption": "none" },
             "streamSettings": {
                 "network": "xhttp", "security": "none",
-                "xhttpSettings": { "mode": "packet-up", "path": "/" }
+                "xhttpSettings": { "mode": "packet-up", "path": "/" },
+                "sockopt": { "tcpFastOpen": True, "tcpNoDelay": True }
+            },
+            "sniffing": { "enabled": adv.get("deepSniff", True), "destOverride": sniff_override }
+        },
+        {
+            "tag": "vless-ws", "port": XRAY_WS_PORT, "listen": "127.0.0.1", "protocol": "vless",
+            "settings": { "clients": inb_clients, "decryption": "none" },
+            "streamSettings": {
+                "network": "ws", "security": "none",
+                "wsSettings": { "path": "/ws" },
+                "sockopt": { "tcpFastOpen": True, "tcpNoDelay": True }
             },
             "sniffing": { "enabled": adv.get("deepSniff", True), "destOverride": sniff_override }
         },
@@ -2093,13 +2442,12 @@ def start_xray():
             
         ok = False
         for _ in range(75):
-            if check_xray_running() and check_port_listening(XRAY_PORT):
+            if check_xray_running() and check_port_listening(XRAY_XHTTP_PORT):
                 ok = True
                 break
             time.sleep(0.2)
         if ok:
-            try: urllib.request.urlopen(f"http://127.0.0.1:{XRAY_PORT}/", timeout=1)
-            except Exception: pass
+            start_multiplexer()
             trigger_make_ports_public()
             return
         stop_xray()
@@ -2112,7 +2460,7 @@ def stop_xray():
 def print_start_banner():
     panel_url = f"https://{WEB_DOMAIN}/"
     print("\n" + "="*60)
-    print("🚀 G2LEAFY PANEL STARTED SUCCESSFULLY")
+    print("🚀 G2RAY PANEL STARTED SUCCESSFULLY")
     print("="*60)
     print(f"🌐 Access Web Panel & Subscriptions: \033[92m\033[4m{panel_url}\033[0m")
     print(f"🔗 Forwarded Xray Port: \033[94m{PORT_DOMAIN}:{XRAY_PORT}\033[0m")
@@ -2157,7 +2505,7 @@ def main():
         state["total_down"] = tel.get("total_down", 0)
         state["total_up"] = tel.get("total_up", 0)
         state["uptime_sec"] = tel.get("uptime_sec", 0)
-        if any("Community_Donate" in c.get("name", "") or "🍃G2Leafy |" in c.get("name", "") for c in pstate.get("clients", [])):
+        if any("Community_Donate" in c.get("name", "") or "Code-Leafy🍃 |" in c.get("name", "") for c in pstate.get("clients", [])):
             state["donate_active"] = True
     except Exception: pass
 
@@ -2167,7 +2515,6 @@ def main():
     threading.Thread(target=system_monitor_thread, daemon=True).start()
     threading.Thread(target=xray_monitor_thread, daemon=True).start()
     threading.Thread(target=web_server_thread, args=(WEB_PORT,), daemon=True).start()
-    trigger_make_ports_public()
     
     print_start_banner()
     
