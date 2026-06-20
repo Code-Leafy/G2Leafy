@@ -1,12 +1,12 @@
 <div align="center">
 
-# G2ray
+# G2Leafy
 
 A sleek **web dashboard** for managing Xray VLESS xHTTP configs on GitHub Codespaces.
 
-[![Version](https://img.shields.io/badge/version-3.0.0-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2ray)
-[![License](https://img.shields.io/badge/license-MIT-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2ray)
-[![Status](https://img.shields.io/badge/status-stable-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2ray)
+[![Version](https://img.shields.io/badge/version-3.0.0-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2Leafy)
+[![License](https://img.shields.io/badge/license-MIT-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2Leafy)
+[![Status](https://img.shields.io/badge/status-stable-2DC94E?style=flat-square)](https://github.com/Code-Leafy/G2Leafy)
 
 </div>
 
@@ -14,7 +14,7 @@ A sleek **web dashboard** for managing Xray VLESS xHTTP configs on GitHub Codesp
 <div align="center">
 <!-- 📸 Panel Preview Image -->
 
-<img src="assets/preview.png" alt="G2ray Web Dashboard Preview" width="720" style="border-radius: 12px; border: 1px solid rgba(0,0,0,0.05);">
+<img src="assets/preview.png" alt="G2Leafy Web Dashboard Preview" width="720" style="border-radius: 12px; border: 1px solid rgba(0,0,0,0.05);">
 
 </div>
 
@@ -22,7 +22,7 @@ A sleek **web dashboard** for managing Xray VLESS xHTTP configs on GitHub Codesp
 
 ## Overview
 
-G2ray is a powerful, interactive **web panel dashboard** designed to instantly deploy and manage Xray VLESS xHTTP configurations. Built specifically for the GitHub Codespaces environment, it automates port management, client creation, subscription generation, traffic monitoring, and connection controls through a modern browser-based UI.
+G2Leafy is a powerful, interactive **web panel dashboard** designed to instantly deploy and manage Xray VLESS xHTTP configurations. Built specifically for the GitHub Codespaces environment, it automates port management, client creation, subscription generation, traffic monitoring, and connection controls through a modern browser-based UI.
 
 Once the Python backend starts, it serves a full dashboard on the forwarded Codespaces web port. From there, you can manage clients, preview generated configs, copy subscription links, view logs, monitor usage, and control the Xray core without using a terminal UI.
 
@@ -33,10 +33,10 @@ Once the Python backend starts, it serves a full dashboard on the forwarded Code
 <details open>
 <summary><kbd>🔗</kbd> Community Donated Configs (SUB)</summary>
 
-Want to use public nodes donated by other G2ray users? Import this subscription link directly into your V2ray/Xray client:
+Want to use public nodes donated by other G2Leafy users? Import this subscription link directly into your V2ray/Xray client:
 
 ```text
-https://raw.githubusercontent.com/Code-Leafy/G2ray/main/configs.txt
+https://raw.githubusercontent.com/Code-Leafy/G2Leafy/main/configs.txt
 ```
 
 </details>
@@ -73,7 +73,7 @@ Donate a generated config from the panel to share access with the community whil
 
 | 🛠️ Configuration Optimizer |
 | :--- |
-| To finalize your setup, take the config received from the panel and visit **[NetLeafy](https://code-leafy.github.io/NetLeafy)**. Set the server mode to **G2ray** and paste your link to generate a fully optimized connection. |
+| To finalize your setup, take the config received from the panel and visit **[NetLeafy](https://code-leafy.github.io/NetLeafy)**. Set the server mode to **G2Leafy** and paste your link to generate a fully optimized connection. |
 
 </div>
 
@@ -141,7 +141,7 @@ graph LR
 <summary><kbd>📁</kbd> Project Structure</summary>
 
 ```text
-G2ray/
+G2Leafy/
 ├── data/                    # Dynamic storage for usage stats, UUIDs, panel state, and configs
 ├── logs/                    # Xray and panel logs
 ├── assets/                  # Media resources, previews, and videos
@@ -193,6 +193,6 @@ Make sure the generated config uses the Codespaces forwarding domain for `sni` a
 
 > **⚠️ Educational Purpose Only:** This project is provided for educational and research purposes. Users are solely responsible for compliance with all local laws. The developer assumes no liability for misuse.
 
-[MIT License](https://github.com/Code-Leafy/G2ray/blob/main/LICENSE) · Crafted by [Code-Leafy](https://github.com/Code-Leafy)
+[MIT License](https://github.com/Code-Leafy/G2Leafy/blob/main/LICENSE) · Crafted by [Code-Leafy](https://github.com/Code-Leafy)
 
 </div>
