@@ -11,7 +11,6 @@ A sleek **web dashboard** for managing Xray VLESS xHTTP configs on GitHub Codesp
 
 ---
 <div align="center">
-<!-- 📸 Panel Preview Image -->
 
 <img src="assets/preview.png" alt="G2Leafy Web Dashboard Preview" width="720" style="border-radius: 12px; border: 1px solid rgba(0,0,0,0.05);">
 
@@ -30,7 +29,7 @@ Once the Python backend starts, it serves a full dashboard on the forwarded Code
 ---
 
 <details open>
-<summary><kbd>🔗</kbd> Community Donated Configs (SUB)</summary>
+<summary><kbd>Community Donated Configs (SUB)</kbd></summary>
 
 Want to use public nodes donated by other G2Leafy users? Import this subscription link directly into your V2ray/Xray client:
 
@@ -44,33 +43,33 @@ https://raw.githubusercontent.com/Code-Leafy/G2Leafy/main/configs.txt
 
 ## Core Features
 
-### ⚡ Web Dashboard Control Panel
+### Web Dashboard Control Panel
 
 Manage everything from a clean browser UI instead of a terminal/curses interface. Create clients, edit limits, view QR codes, copy subscription links, restart Xray, and monitor the system from one dashboard.
 
-### 🔐 VLESS xHTTP Config Generation
+### VLESS xHTTP Config Generation
 
 Generate VLESS xHTTP client links and subscription outputs for GitHub Codespaces forwarding domains. The panel is designed around modern Xray clients and avoids deprecated insecure TLS options.
 
-### 📡 Live Analytics & Quota
+### Live Analytics & Quota
 
 Tracks real-time RX/TX data consumption, connection status, Xray uptime, CPU/RAM usage, disk usage, and estimated Codespaces free-tier quota.
 
-### 🧪 Subscription Lab
+### Subscription Lab
 
 Build custom per-client subscription layouts directly in the web panel. Add proxy entries, info entries, placeholders, custom names, usage indicators, and live mobile-style previews.
 
-### 🔄 Optional Wake Lock / Keepalive
+### Optional Wake Lock / Keepalive
 
 Includes optional controls for keeping the runtime active while the service is in use. This can be toggled from the web dashboard.
 
-### 📦 Community Config Network
+### Community Config Network
 
 Donate a generated config from the panel to share access with the community while keeping your personal clients separate.
 
 <div align="center">
 
-| 🛠️ Configuration Optimizer |
+| Configuration Optimizer |
 | :--- |
 | To finalize your setup, take the config received from the panel and visit **[NetLeafy](https://code-leafy.github.io/NetLeafy)**. Set the server mode to **G2Leafy** and paste your link to generate a fully optimized connection. |
 
@@ -78,15 +77,15 @@ Donate a generated config from the panel to share access with the community whil
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### 🌐 1. GitHub Codespaces (Browser / VS Code)
+### 1. GitHub Codespaces (Browser / VS Code)
 
 *No local installation required.*
 
 1. **Fork the Repository**: Click **Fork** at the top-right of this GitHub page.
-2. **Create a Codespace**: Open your fork → Click the green **Code** button → **Codespaces** tab → **Create codespace on main**.
-3. **Wait for Environment**: Allow 1–2 minutes for the container to build.
+2. **Create a Codespace**: Open your fork, click the green **Code** button, go to **Codespaces** tab, and click **Create codespace on main**.
+3. **Wait for Environment**: Allow 1-2 minutes for the container to build.
 4. **Launch Backend**: The `g2leafy.py` backend should start automatically in the integrated VS Code terminal.
 5. **Open Web Dashboard**: Open the forwarded web port URL printed in the terminal. It will look similar to:
 
@@ -137,7 +136,7 @@ graph LR
 
 <details>
 
-<summary><kbd>📁</kbd> Project Structure</summary>
+<summary><kbd>Project Structure</kbd></summary>
 
 ```text
 G2Leafy/
@@ -154,7 +153,7 @@ G2Leafy/
 
 <details>
 
-<summary><kbd>❓</kbd> FAQ & Troubleshooting</summary>
+<summary><kbd>FAQ</kbd></summary>
 
 ### Is this still a TUI/curses panel?
 
@@ -190,7 +189,7 @@ Make sure the generated config uses the Codespaces forwarding domain for `sni` a
 
 <div align="center">
 
-> **⚠️ Educational Purpose Only:** This project is provided for educational and research purposes. Users are solely responsible for compliance with all local laws. The developer assumes no liability for misuse.
+> **Educational Purpose Only:** This project is provided for educational and research purposes. Users are solely responsible for compliance with all local laws. The developer assumes no liability for misuse.
 
 [MIT License](https://github.com/Code-Leafy/G2Leafy/blob/main/LICENSE) · Crafted by [Code-Leafy](https://github.com/Code-Leafy)
 
