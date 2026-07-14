@@ -1,0 +1,152 @@
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "none",
+    "error": "/workspaces/G2Leafy/logs/xray.log"
+  },
+  "stats": {},
+  "api": {
+    "tag": "api",
+    "services": [
+      "StatsService"
+    ]
+  },
+  "dns": {
+    "servers": [
+      "1.1.1.1",
+      "8.8.8.8"
+    ],
+    "disableCache": false
+  },
+  "routing": {
+    "rules": [
+      {
+        "inboundTag": [
+          "api"
+        ],
+        "outboundTag": "api",
+        "type": "field"
+      }
+    ]
+  },
+  "policy": {
+    "system": {
+      "statsInboundDownlink": true,
+      "statsInboundUplink": true
+    },
+    "levels": {
+      "0": {
+        "statsUserUplink": true,
+        "statsUserDownlink": true,
+        "bufferSize": 4,
+        "connIdle": 300,
+        "handshake": 4
+      }
+    }
+  },
+  "inbounds": [
+    {
+      "tag": "vless-xhttp",
+      "port": 10001,
+      "listen": "127.0.0.1",
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "5ee4854c-8c55-49d7-ae10-d0bae0828ade",
+            "level": 0,
+            "email": "5ee4854c-8c55-49d7-ae10-d0bae0828ade"
+          },
+          {
+            "id": "807c3318-a91d-4f6d-aad2-c0f963ee1aed",
+            "level": 0,
+            "email": "807c3318-a91d-4f6d-aad2-c0f963ee1aed"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "none",
+        "xhttpSettings": {
+          "mode": "packet-up",
+          "path": "/"
+        },
+        "sockopt": {
+          "tcpFastOpen": true,
+          "tcpNoDelay": true
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "vless-ws",
+      "port": 10003,
+      "listen": "127.0.0.1",
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "5ee4854c-8c55-49d7-ae10-d0bae0828ade",
+            "level": 0,
+            "email": "5ee4854c-8c55-49d7-ae10-d0bae0828ade"
+          },
+          {
+            "id": "807c3318-a91d-4f6d-aad2-c0f963ee1aed",
+            "level": 0,
+            "email": "807c3318-a91d-4f6d-aad2-c0f963ee1aed"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+        "wsSettings": {
+          "path": "/ws"
+        },
+        "sockopt": {
+          "tcpFastOpen": true,
+          "tcpNoDelay": true
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "listen": "127.0.0.1",
+      "port": 10085,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "127.0.0.1"
+      },
+      "tag": "api"
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIP"
+      }
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "clients": [
+    {
+      "id": "5ee4854c-8c55-49d7-ae10-d0bae0828ade",
+      "usage": 1.0514121502637863,
+      "name": "Sadra",
+      "limit": 0,
+      "expiry": "",
+      "status": 1,
+      "utls": "random"
+    },
+    {
+      "id": "807c3318-a91d-4f6d-aad2-c0f963ee1aed",
+      "usage": 4.991050809621811e-05,
+      "name": "\u0645\u0638\u0644\u0648\u0645\u0627\u0646 \u0633\u06cc\u0627\u0633\u062a",
+      "limit": 0,
+      "expiry": "",
+      "status": 1,
+      "utls": "random"
+    }
+  ],
+  "subClientSubscriptions": {
+    "5ee4854c-8c55-49d7-ae10-d0bae0828ade": [
+      {
+        "id": "c2a04e51-a413-4057-be55-988ae4b11f57",
+        "type": "proxy",
+        "transport": "xhttp",
+        "name": "%client-name% \ud83c\udf43 1",
+        "ipAddress": "silver-fiesta-jrp4qr7r9p9fqx5j-443.app.github.dev"
+      },
+      {
+        "id": "89278d75-9c50-4d96-b53a-2557c098d5de",
+        "type": "proxy",
+        "transport": "ws",
+        "name": "%client-name% \ud83c\udf43 2",
+        "ipAddress": "silver-fiesta-jrp4qr7r9p9fqx5j-443.app.github.dev"
+      },
+      {
+        "id": "31b37540-cdde-492c-9904-76de34f7eb8c",
+        "type": "info",
+        "transport": "xhttp",
+        "name": "%client-name% | %data-used%GB / %data-total%GB ",
+        "ipAddress": "silver-fiesta-jrp4qr7r9p9fqx5j-443.app.github.dev"
+      }
+    ],
+    "807c3318-a91d-4f6d-aad2-c0f963ee1aed": [
+      {
+        "id": "2477c96d-deb0-46d9-b8ff-9060ca69162a",
+        "type": "info",
+        "transport": "xhttp",
+        "name": "%data-used%GB / %data-total%GB ",
+        "ipAddress": "silver-fiesta-jrp4qr7r9p9fqx5j-443.app.github.dev"
+      },
+      {
+        "id": "94c3265c-3093-479e-b239-f68097efd626",
+        "type": "proxy",
+        "transport": "xhttp",
+        "name": "%client-name% \ud83c\udf43 1",
+        "ipAddress": "silver-fiesta-jrp4qr7r9p9fqx5j-443.app.github.dev"
+      },
+      {
+        "id": "4d4c9269-533b-44d7-8b85-9de9ad75cb8e",
+        "type": "proxy",
+        "transport": "xhttp",
+        "name": "%client-name% \ud83c\udf43 2",
+        "ipAddress": "silver-fiesta-jrp4qr7r9p9fqx5j-443.app.github.dev"
+      }
+    ]
+  },
+  "settings": {
+    "wakeLock": true,
+    "quotaBalance": 0,
+    "advanced": {
+      "domainStrategy": "UseIP",
+      "deepSniff": true,
+      "sniffHttp": true,
+      "sniffTls": true,
+      "sniffQuic": true,
+      "sniffFakedns": false,
+      "bypassIr": false,
+      "bypassRu": false,
+      "bypassCn": false,
+      "bypassLan": false,
+      "dnsPrimary": "1.1.1.1",
+      "dnsFallback": "8.8.8.8",
+      "dnsCache": true,
+      "mux": false,
+      "muxConcurrency": 8,
+      "tlsFragment": "none",
+      "logLevel": "warning",
+      "accessLog": false
+    },
+    "panelPassword": "Mohammadi.s6853"
+  },
+  "telemetry": {
+    "total_down": 992879896,
+    "total_up": 122168091,
+    "uptime_sec": 3836.8458075523376
+  }
+}
